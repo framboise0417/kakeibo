@@ -74,6 +74,7 @@ button:hover{
 <option>服飾・美容</option>
 <option>食費</option>
 <option>その他</option>
+<option></option>
 </select>
 
 <label>収入 / 支出</label>
@@ -92,6 +93,7 @@ button:hover{
 <select id="temporary">
 <option value="">--選択--</option>
 <option>レ</option>
+<option></option>
 </select>
 
 <label>金額</label>
@@ -183,7 +185,7 @@ document.addEventListener("DOMContentLoaded", initDate);
 
 // Excelに行追加
 async function addRow(values){
-  const endpoint = "https://graph.microsoft.com/v1.0/me/drive/root:/家計簿.xlsx:/workbook/tables/KakeiboMeisa/rows/add";
+  const endpoint = "https://graph.microsoft.com/v1.0/me/drive/root:/家計簿.xlsx:/workbook/tables/KakeiboMeisai/rows/add";
   const response = await fetch(endpoint,{
     method:"POST",
     headers:{
