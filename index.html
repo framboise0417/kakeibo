@@ -1,76 +1,63 @@
-```html
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <title>家計簿アプリ</title>
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-
 body{
-font-family:sans-serif;
-background:#f5f5f5;
-margin:0;
-padding:20px;
+  font-family:sans-serif;
+  background:#f5f5f5;
+  margin:0;
+  padding:20px;
 }
-
 .container{
-max-width:500px;
-margin:auto;
-background:white;
-padding:20px;
-border-radius:10px;
-box-shadow:0 2px 10px rgba(0,0,0,0.1);
+  max-width:500px;
+  margin:auto;
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.1);
 }
-
 h2{
-text-align:center;
+  text-align:center;
 }
-
 label{
-font-weight:bold;
-display:block;
-margin-top:10px;
+  font-weight:bold;
+  display:block;
+  margin-top:10px;
 }
-
 select,input{
-width:100%;
-padding:10px;
-margin-top:5px;
-font-size:16px;
+  width:100%;
+  padding:10px;
+  margin-top:5px;
+  font-size:16px;
 }
-
 button{
-margin-top:20px;
-width:100%;
-padding:12px;
-font-size:18px;
-background:#0078d4;
-color:white;
-border:none;
-border-radius:6px;
+  margin-top:20px;
+  width:100%;
+  padding:12px;
+  font-size:18px;
+  background:#0078d4;
+  color:white;
+  border:none;
+  border-radius:6px;
 }
-
 button:hover{
-background:#005fa3;
+  background:#005fa3;
 }
-
 #status{
-margin-top:15px;
-text-align:center;
-font-weight:bold;
+  margin-top:15px;
+  text-align:center;
+  font-weight:bold;
 }
-
 </style>
 
 <script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"></script>
-
 </head>
 
 <body>
-
 <div class="container">
 
 <h2>家計簿入力</h2>
@@ -83,10 +70,10 @@ font-weight:bold;
 
 <label>カテゴリー</label>
 <select id="category">
+<option value="">--選択--</option>
 <option>服飾・美容</option>
 <option>食費</option>
 <option>その他</option>
-<option></option>
 </select>
 
 <label>収入 / 支出</label>
@@ -103,7 +90,7 @@ font-weight:bold;
 
 <label>臨時</label>
 <select id="temporary">
-<option></option>
+<option value="">--選択--</option>
 <option>レ</option>
 </select>
 
@@ -117,51 +104,132 @@ font-weight:bold;
 </div>
 
 <script>
-
 const msalInstance = new msal.PublicClientApplication({
-
-auth:{
-clientId:"fb640c92-2437-422a-86d5-3dac4320e90f",
-authority:"https://login.microsoftonline.com/consumers",
-redirectUri:"https://framboise0417.github.io/kakeibo/"
-},
-
-cache:{
-cacheLocation:"localStorage"
-}
-
+  auth:{
+    clientId:"fb640c92-2437-422a-86d5-3dac4320e90f",
+    authority:"https://login.microsoftonline.com/consumers",
+    redirectUri:"https://framboise0417.github.io/kakeibo/"
+  },
+  cache:{
+    cacheLocation:"localStorage"
+  }
 });
 
-let accessToken=null;
+let accessToken = null;
 
+// 初回のみログイン
 async function initializeAuth(){
+  const response = await msalInstance.handleRedirectPromise();
+  if(response){
+    msalInstance.setActiveAccount(response.account);
+  }
 
-const response=await msalInstance.handleRedirectPromise();
-
-if(response){
-msalInstance.setActiveAccount(response.account);
+  let account = msalInstance.getActiveAccount();
+  if(!account){
+    const accounts = msalInstance.getAllAccounts();
+    if(accounts.length>0){
+      account = accounts[0];
+      msalInstance.setActiveAccount(account);
+    }
+  }
 }
-
-let account=msalInstance.getActiveAccount();
-
-if(!account){
-
-const accounts=msalInstance.getAllAccounts();
-
-if(accounts.length>0){
-
-account=accounts[0];
-msalInstance.setActiveAccount(account);
-
-}
-
-}
-
-}
-
 initializeAuth();
 
+// トークン取得（silent / redirect fallback）
 async function getToken(){
+  let account = msalInstance.getActiveAccount();
+  if(!account){
+    await msalInstance.loginRedirect({scopes:["Files.ReadWrite"]});
+    return;
+  }
+  try{
+    const tokenResponse = await msalInstance.acquireTokenSilent({
+      scopes:["Files.ReadWrite"],
+      account:account
+    });
+    return tokenResponse.accessToken;
+  }catch{
+    await msalInstance.acquireTokenRedirect({scopes:["Files.ReadWrite"]});
+  }
+}
 
-let account=ms
-```
+// 年・月の初期化
+function initDate(){
+  const yearSelect = document.getElementById("year");
+  const monthSelect = document.getElementById("month");
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth()+1;
+
+  // 年: YYYY年
+  for(let i=currentYear-3;i<=currentYear+1;i++){
+    const option = document.createElement("option");
+    option.value = i+"年";
+    option.text = i+"年";
+    if(i===currentYear) option.selected=true;
+    yearSelect.appendChild(option);
+  }
+
+  // 月: M月
+  for(let i=1;i<=12;i++){
+    const option = document.createElement("option");
+    option.value = i+"月";
+    option.text = i+"月";
+    if(i===currentMonth) option.selected=true;
+    monthSelect.appendChild(option);
+  }
+}
+document.addEventListener("DOMContentLoaded", initDate);
+
+// Excelに行追加
+async function addRow(values){
+  const endpoint = "https://graph.microsoft.com/v1.0/me/drive/root:/家計簿.xlsx:/workbook/tables/KakeiboMeisa/rows/add";
+  const response = await fetch(endpoint,{
+    method:"POST",
+    headers:{
+      Authorization:"Bearer "+accessToken,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({values:[values]})
+  });
+  return response.json();
+}
+
+// 登録ボタン押下
+async function submitForm(){
+  const status = document.getElementById("status");
+  const year = document.getElementById("year").value;
+  const month = document.getElementById("month").value;
+  const category = document.getElementById("category").value;
+  const incomeExpense = document.getElementById("incomeExpense").value;
+  const summary = document.getElementById("summary").value;
+  const note = document.getElementById("note").value;
+  const temporary = document.getElementById("temporary").value;
+  const amount = document.getElementById("amount").value;
+
+  if(!summary){ alert("摘要を入力してください"); return; }
+  if(!amount){ alert("金額を入力してください"); return; }
+
+  status.innerText = "送信中...";
+
+  try{
+    accessToken = await getToken();
+    const values = [year, month, category, incomeExpense, summary, note, temporary, Number(amount)];
+    await addRow(values);
+    status.innerText="登録完了";
+
+    // フォームクリア
+    document.getElementById("summary").value="";
+    document.getElementById("note").value="";
+    document.getElementById("amount").value="";
+    document.getElementById("category").value="";
+    document.getElementById("temporary").value="";
+
+  }catch(e){
+    console.error(e);
+    status.innerText="エラーが発生しました";
+  }
+}
+</script>
+</body>
+</html>
