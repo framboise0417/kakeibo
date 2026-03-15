@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>家計簿アプリ</title>
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<style>
+body{
+  font-family:sans-serif;
+  background:#f5f5f5;
+  padding:15px;
+}
+
+.container{
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  max-width:420px;
+  margin:auto;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+
+h2{
+  text-align:center;
+}
+
+label{
+  font-size:14px;
+  margin-top:10px;
+  display:block;
+}
+
+select,input{
+  width:100%;
+  padding:8px;
+  margin-top:4px;
+  box-sizing:border-box;
+  font-size:16px;
+}
+
+button{
+  width:100%;
+  margin-top:15px;
+  padding:12px;
+  font-size:16px;
+  background:#0078d4;
+  color:white;
+  border:none;
+  border-radius:6px;
+}
+
+button:active{
+  background:#005fa3;
+}
+
+.status{
+  text-align:center;
+  margin-top:10px;
+  font-size:13px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>家計簿入力</h2>
+
+<label>年</label>
+<input id="year" disabled>
+
+<label>月</label>
+<select id="month">
+<option>1月</option>
+<option>2月</option>
+<option>3月</option>
+<option>4月</option>
+<option>5月</option>
+<option>6月</option>
+<option>7月</option>
+<option>8月</option>
+<option>9月</option>
+<option>10月</option>
+<option>11月</option>
+<option>12月</option>
+</select>
+
+<label>カテゴリー</label>
+<select id="category">
+<option>服飾・美容</option>
+<option>食費</option>
+<option>その他</option>
+<option></option>
+</select>
+
+<label>収入 / 支出</label>
+<select id="incomeExpense">
+<option>支出</option>
+<option>収入</option>
+</select>
+
+<label>摘要</label>
+<input id="summary" placeholder="例：昼食">
+
+<label>補足</label>
+<input id="note" placeholder="任意">
+
+<label>臨時支出</label>
+<select id="temporary">
+<option></option>
+<option>レ</option>
+</select>
+
+<label>金額</label>
+<input type="number" id="amount" placeholder="円">
+
+<button onclick="submitForm()">登録</button>
+
+<div class="status" id="status"></div>
+
+</div>
+
+<script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"></script>
+
+<script>
+
+/* =====================
+  初期表示（現在年月）
+===================== */
+
+const now = new Date();
+
+document.getElementById("year").value =
+now.getFullYear() + "年";
+
+
+/* =====================
+  Azure設定
+===================== */
+
+const msalInstance =
+new msal.PublicClientApplication({
+auth:{
+clientId:"fb640c92-2437-422a-86d5-3dac4320e90f",
+authority:"https://login.microsoftonline.com/consumers",
+redirectUri:window.location.origin
+}
+});
+
+let accessToken=null;
+
+/* =====================
+  トークン取得（再利用）
+===================== */
+
+async function getToken(){
+
+if(accessToken) return accessToken;
+
+await msalInstance.loginPopup({
+scopes:["Files.ReadWrite"]
+});
+
+const tokenResponse =
+await msalInstance.acquireTokenPopup({
+scopes:["Files.ReadWrite"]
+});
+
+accessToken = tokenResponse.accessToken;
+
+return accessToken;
+}
+
+/* =====================
+  Excel追加
+===================== */
+
+async function addRow(values){
+
+const endpoint =
+"https://graph.microsoft.com/v1.0/me/drive/root:/家計簿.xlsx:/workbook/tables/KakeiboMeisai/rows/add";
+
+const res = await fetch(endpoint,{
+method:"POST",
+headers:{
+Authorization:"Bearer "+accessToken,
+"Content-Type":"application/json"
+},
+body:JSON.stringify({values:[values]})
+});
+
+return await res.json();
+}
+
+/* =====================
+  入力チェック
+===================== */
+
+function validate(){
+
+if(!amount.value){
+alert("金額を入力してください");
+return false;
+}
+
+if(!summary.value){
+alert("摘要を入力してください");
+return false;
+}
+
+return true;
+}
+
+/* =====================
+  登録処理
+===================== */
+
+async function submitForm(){
+
+if(!validate()) return;
+
+status.innerText="送信中...";
+
+try{
+
+await getToken();
+
+const values=[
+
+year.value,
+month.value,
+category.value,
+incomeExpense.value,
+summary.value,
+note.value,
+temporary.value,
+Number(amount.value)
+
+];
+
+await addRow(values);
+
+status.innerText="✅ 登録完了";
+
+summary.value="";
+note.value="";
+amount.value="";
+summary.focus();
+
+}catch(e){
+
+console.error(e);
+status.innerText="❌ エラー発生";
+
+}
+
+}
+
+</script>
+
+</body>
+</html>
